@@ -2,15 +2,15 @@
 //! Rust definitions for the fur.ink gRPC backend services.
 
 pub mod users {
-	//! Users service definitions.
+    //! Users service definitions.
     tonic::include_proto!("furink.users");
 }
 
 pub mod posts {
-	//! Posts service definitions.
+    //! Posts service definitions.
     tonic::include_proto!("furink.posts");
 }
 pub mod session {
-	//! Session service definitions.
+    //! Session service definitions.
     tonic::include_proto!("furink.session");
 }

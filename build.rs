@@ -1,4 +1,11 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::compile_protos("proto/furink.proto")?;
-	Ok(())
+    tonic_build::configure().compile(
+        &[
+            "proto/posts.proto",
+            "proto/session.proto",
+            "proto/users.proto",
+        ],
+        &["proto"],
+    )?;
+    Ok(())
 }
