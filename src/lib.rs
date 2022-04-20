@@ -4,6 +4,11 @@
 //! Protocol version string, compiled from git revision and semver.
 pub static VERSION: &'static str = env!("VERGEN_GIT_SEMVER");
 
+pub mod cache {
+	//! Cache service definitions.
+	tonic::include_proto!("furink.cache");
+}
+
 pub mod discovery {
     //! DIscoery service definitions.
     tonic::include_proto!("furink.discovery");
