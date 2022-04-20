@@ -32,9 +32,14 @@ pub mod version {
     //! Version service definitions.
     tonic::include_proto!("furink.version");
 
-    use tonic::{Code, Request, Response, Status};
+	use std::error::Error;
 
-    use self::version_service_server::VersionService;
+    use tonic::{Code, Request, Response, Status, transport::{Endpoint, Channel}};
+    use tracing::{info, debug};
+
+    use crate::discovery::{RegisterRequest, discovery_service_client::DiscoveryServiceClient};
+
+    use self::{version_service_server::VersionService, version_service_client::VersionServiceClient};
     use super::VERSION;
 
     /// A basic version verification service implementation.
@@ -55,4 +60,21 @@ pub mod version {
             }
         }
     }
+
+	/// Validate and register a client with the service manager. Produces a channel that can 
+	pub async fn validate_and_register<S: Into<Endpoint>>(url: S, conf: RegisterRequest) -> Result<Channel, Box<dyn Error>> {
+		let endpoint: Endpoint = url.into();
+		let channel = endpoint.connect().await?;
+		// connect to version service and validate
+		let mut version_client = VersionServiceClient::new(channel.clone());
+		version_client.validate(VersionRequest { version: VERSION.to_string() }).await?;
+		// courtesy of cheesy
+		info!("kaylen is best girl, that is all");
+		debug!("wrong and incorrect");
+		// register with service manager
+		let mut discovery_client = DiscoveryServiceClient::new(channel.clone());
+		discovery_client.register(Request::new(conf)).await?;
+		// consume and return channel
+		Ok(channel)
+	}
 }
