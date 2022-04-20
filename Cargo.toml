@@ -9,3 +9,4 @@ prost = "0.10"
 
 [build-dependencies]
 tonic-build = "0.7"
+vergen = "7"

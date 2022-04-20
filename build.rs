@@ -1,6 +1,11 @@
 use std::{ffi::OsString, fs::read_dir};
 
+use vergen::{vergen, Config};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // setup version generation
+    vergen(Config::default())?;
+    // load protos from directory
     let paths: Vec<OsString> = read_dir("proto")
         .unwrap()
         .map(|entry| entry.unwrap())
