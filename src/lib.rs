@@ -5,8 +5,8 @@
 pub static VERSION: &'static str = env!("VERGEN_GIT_SEMVER");
 
 pub mod cache {
-	//! Cache service definitions.
-	tonic::include_proto!("furink.cache");
+    //! Cache service definitions.
+    tonic::include_proto!("furink.cache");
 }
 
 pub mod discovery {
@@ -32,14 +32,21 @@ pub mod version {
     //! Version service definitions.
     tonic::include_proto!("furink.version");
 
-	use std::error::Error;
+    use std::{error::Error, time::Duration};
 
-    use tonic::{Code, Request, Response, Status, transport::{Endpoint, Channel}};
-    use tracing::{info, debug};
+    use tonic::{
+        transport::{Channel, Endpoint},
+        Code, Request, Response, Status,
+    };
+    use tracing::{debug, info};
 
-    use crate::discovery::{RegisterRequest, discovery_service_client::DiscoveryServiceClient};
+    use crate::discovery::{
+        discovery_service_client::DiscoveryServiceClient, HeartbeatPayload, RegisterRequest,
+    };
 
-    use self::{version_service_server::VersionService, version_service_client::VersionServiceClient};
+    use self::{
+        version_service_client::VersionServiceClient, version_service_server::VersionService,
+    };
     use super::VERSION;
 
     /// A basic version verification service implementation.
@@ -61,20 +68,58 @@ pub mod version {
         }
     }
 
-	/// Validate and register a client with the service manager. Produces a channel that can 
-	pub async fn validate_and_register<S: Into<Endpoint>>(url: S, conf: RegisterRequest) -> Result<Channel, Box<dyn Error>> {
-		let endpoint: Endpoint = url.into();
-		let channel = endpoint.connect().await?;
-		// connect to version service and validate
-		let mut version_client = VersionServiceClient::new(channel.clone());
-		version_client.validate(VersionRequest { version: VERSION.to_string() }).await?;
-		// courtesy of cheesy
-		info!("kaylen is best girl, that is all");
-		debug!("wrong and incorrect");
-		// register with service manager
-		let mut discovery_client = DiscoveryServiceClient::new(channel.clone());
-		discovery_client.register(Request::new(conf)).await?;
-		// consume and return channel
-		Ok(channel)
-	}
+    /// Validate and register a client with the service manager. Produces the service's assigned ID
+    /// and a channel that can be used to send heartbeats to the service.
+    pub async fn validate_and_register<S: Into<Endpoint>>(
+        url: S,
+        conf: RegisterRequest,
+    ) -> Result<(String, Channel), Box<dyn Error>> {
+        let endpoint: Endpoint = url.into();
+        let channel = endpoint.connect().await?;
+        // connect to version service and validate
+        let mut version_client = VersionServiceClient::new(channel.clone());
+        version_client
+            .validate(VersionRequest {
+                version: VERSION.to_string(),
+            })
+            .await?;
+        // courtesy of cheesy
+        info!("kaylen is best girl, that is all");
+        debug!("wrong and incorrect");
+        // register with service manager
+        let mut discovery_client = DiscoveryServiceClient::new(channel.clone());
+        let res = discovery_client
+            .register(Request::new(conf))
+            .await?
+            .into_inner();
+        // consume and return channel
+        Ok((res.id, channel))
+    }
+
+    /// The configuration used by the `spawn_heartbeat_task` function.
+    pub struct HeartbeatConfig {
+        /// The interval at which the heartbeat task should run.
+        pub interval: Duration,
+        /// The ID of the service heartbeating.
+        pub id: String,
+        /// The channel to use for heartbeating.
+        pub channel: Channel,
+    }
+
+    /// Spawn an asynchronous task that will send heartbeats to the service manager.
+    pub fn spawn_heartbeat_task(conf: HeartbeatConfig) {
+        tokio::spawn(async move {
+            let mut client = DiscoveryServiceClient::new(conf.channel);
+            loop {
+                debug!(message = "sending heartbeat", %conf.id);
+                client
+                    .heartbeat(Request::new(HeartbeatPayload {
+                        id: conf.id.clone(),
+                    }))
+                    .await
+                    .expect("failed to heartbeat server");
+                tokio::time::sleep(conf.interval).await;
+            }
+        });
+    }
 }

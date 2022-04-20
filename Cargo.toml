@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tonic = "0.7"
 prost = "0.10"
+tokio = "1"
+tonic = "0.7"
 tracing = "0.1"
 
 [build-dependencies]
